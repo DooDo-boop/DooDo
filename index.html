@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.3 (Long Press Delete)</title>
+  <title>DooDo v0.3.4 (Fixed Rotation/Deletion)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -46,7 +46,7 @@
       -webkit-user-select:none;
       transform-origin: center center;
       will-change: transform;
-      transition: none; /* Initially no transition */
+      transition: none;
     }
     .canvas-shape.selected {
       outline: 2px dashed black;
@@ -198,18 +198,18 @@
       }, { passive: false });
 
       div.addEventListener('touchend', e => {
-        clearTimeout(longPressTimer); // Cancel long press on release
+        clearTimeout(longPressTimer); // Always clear the timer on release
         
         if (gestureInProgress) {
           gestureInProgress = false;
           dragging = false;
           startTouches = [];
-          return;
+          return; // Skip all other touch end logic if gesture was in progress
         }
 
         const now = Date.now();
         
-        // Double-tap check (duplicate logic)
+        // Double-tap check
         if (now - lastTap < 300 && !dragging && e.touches.length === 0) {
           const clone = createShape(shapeKey);
           clone._x = div._x + 20;
@@ -224,11 +224,10 @@
           if (originalShape && clonedShape) {
             clonedShape.setAttribute('fill', originalShape.getAttribute('fill'));
           }
-          
           return;
         }
 
-        // Select this shape (only if not dragging)
+        // Select this shape (only if not dragging and no gesture)
         if (!dragging && e.touches.length === 0) {
           if (selectedShape) {
             selectedShape.classList.remove('selected');
