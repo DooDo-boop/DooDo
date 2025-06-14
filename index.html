@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DooDo v0.1</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { 
+      width:100%; height:100%; 
+      overflow:hidden; /* Prevent scrolling */
+      touch-action:none; /* Disable browser gestures */
+    }
+    body { 
+      background: #E594BF;
+      font-family: sans-serif;
+      position:fixed; /* Fixes mobile viewport issues */
+    }
+    #palette {
+      display:flex; background:#fff; padding:8px;
+      gap:12px; align-items:center;
+      position:relative; /* Ensure it stays above canvas */
+      z-index:10;
+    }
+    .shape-icon, .color-swatch {
+      width:32px; height:32px;
+      border:2px solid #ccc; border-radius:4px;
+      display:flex; justify-content:center; align-items:center;
+      cursor:pointer;
+      user-select:none; /* Prevent text selection */
+      -webkit-tap-highlight-color:transparent; /* Remove tap highlight */
+    }
+    .color-swatch { border-radius:50%; }
+    #canvas {
+      position:fixed; /* Changed from relative to fixed */
+      width:100vw; 
+      height:calc(100vh - 52px);
+      top:52px;
+      left:0;
+      overflow:hidden;
+    }
+    .canvas-shape {
+      position:absolute; 
+      touch-action:none;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+  </style>
+</head>
+<body>
+  <div id="palette">
+    <div id="shape-palette">
+      <div class="shape-icon" data-shape="circle">◯</div>
+      <div class="shape-icon" data-shape="rect">◻︎</div>
+      <div class="shape-icon" data-shape="triangle">△</div>
+    </div>
+    <div id="color-palette">
+      <div class="color-swatch" data-color="#2E3192" style="background:#2E3192;"></div>
+      <div class="color-swatch" data-color="rgba(237,28,36,0.56)" style="background:rgba(237,28,36,0.56);"></div>
+      <div class="color-swatch" data-color="#FAF073" style="background:#FAF073;"></div>
+    </div>
+  </div>
+  <div id="canvas"></div>
+
+  <script>
+    // Mobile detection
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    const shapeSVGs = {
+      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
+      rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
+      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,0 80,80 0,80"/></svg>'
+    };
+
+    const canvas = document.getElementById('canvas');
+    let selectedColor = '#2E3192';
+
+    // Add color palette handler
+    document.querySelectorAll('.color-swatch').forEach(s => {
+      s.addEventListener(isMobile ? 'touchstart' : 'click', (e) => {
+        if(isMobile) e.preventDefault();
+        document.querySelectorAll('.color-swatch').forEach(x=>x.style.border='2px solid #ccc');
+        s.style.border = '2px solid #000';
+        selectedColor = s.dataset.color;
+      });
+    });
+
+    // Add shape palette handler
+    document.querySelectorAll('.shape-icon').forEach(icon => {
+      icon.addEventListener(isMobile ? 'touchstart' : 'click', (e) => {
+        if(isMobile) e.preventDefault();
+        
+        // spawn new shape on canvas center
+        const shapeKey = icon.dataset.shape;
+        const div = document.createElement('div');
+        div.className = 'canvas-shape';
+        div.innerHTML = shapeSVGs[shapeKey];
+        
+        // Center the shape
+        const rect = canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        div.style.left = `${centerX - 40}px`;
+        div.style.top = `${centerY - 40}px`;
+        div.style.fill = selectedColor;
+        canvas.appendChild(div);
+
+        // Touch/pointer event handling
+        let isDragging = false, startX, startY, origX, origY;
+        
+        const handleStart = (e) => {
+          e.preventDefault();
+          isDragging = true;
+          const clientX = e.clientX || e.touches[0].clientX;
+          const clientY = e.clientY || e.touches[0].clientY;
+          
+          startX = clientX;
+          startY = clientY;
+          origX = parseFloat(div.style.left);
+          origY = parseFloat(div.style.top);
+          
+          if(e.pointerId !== undefined) {
+            div.setPointerCapture(e.pointerId);
+          }
+        };
+        
+        const handleMove = (e) => {
+          if (!isDragging) return;
+          e.preventDefault();
+          
+          const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+          const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+          
+          if(clientX === undefined || clientY === undefined) return;
+          
+          const dx = clientX - startX;
+          const dy = clientY - startY;
+          
+          div.style.left = `${origX + dx}px`;
+          div.style.top = `${origY + dy}px`;
+        };
+        
+        const handleEnd = () => {
+          isDragging = false;
+        };
+        
+        // Add both touch and pointer events
+        if(isMobile) {
+          div.addEventListener('touchstart', handleStart, {passive: false});
+          div.addEventListener('touchmove', handleMove, {passive: false});
+          div.addEventListener('touchend', handleEnd);
+        } else {
+          div.addEventListener('pointerdown', handleStart);
+          div.addEventListener('pointermove', handleMove);
+          div.addEventListener('pointerup', handleEnd);
+          div.addEventListener('pointercancel', handleEnd);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
