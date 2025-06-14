@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.1</title>
+  <title>DooDo v0.2 (Pinch Enabled)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
       width:100%; height:100%; 
-      overflow:hidden; /* Prevent scrolling */
-      touch-action:none; /* Disable browser gestures */
+      overflow:hidden;
+      touch-action:none;
     }
     body { 
       background: #E594BF;
       font-family: sans-serif;
-      position:fixed; /* Fixes mobile viewport issues */
+      position:fixed;
     }
     #palette {
       display:flex; background:#fff; padding:8px;
       gap:12px; align-items:center;
-      position:relative; /* Ensure it stays above canvas */
+      position:relative;
       z-index:10;
     }
     .shape-icon, .color-swatch {
@@ -27,12 +27,12 @@
       border:2px solid #ccc; border-radius:4px;
       display:flex; justify-content:center; align-items:center;
       cursor:pointer;
-      user-select:none; /* Prevent text selection */
-      -webkit-tap-highlight-color:transparent; /* Remove tap highlight */
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
     }
     .color-swatch { border-radius:50%; }
     #canvas {
-      position:fixed; /* Changed from relative to fixed */
+      position:fixed;
       width:100vw; 
       height:calc(100vh - 52px);
       top:52px;
@@ -44,6 +44,7 @@
       touch-action:none;
       user-select:none;
       -webkit-user-select:none;
+      transform-origin: center center;
     }
   </style>
 </head>
@@ -63,9 +64,6 @@
   <div id="canvas"></div>
 
   <script>
-    // Mobile detection
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
     const shapeSVGs = {
       circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
       rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
@@ -77,8 +75,8 @@
 
     // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(s => {
-      s.addEventListener(isMobile ? 'touchstart' : 'click', (e) => {
-        if(isMobile) e.preventDefault();
+      s.addEventListener('click', (e) => {
+        e.preventDefault();
         document.querySelectorAll('.color-swatch').forEach(x=>x.style.border='2px solid #ccc');
         s.style.border = '2px solid #000';
         selectedColor = s.dataset.color;
@@ -87,10 +85,9 @@
 
     // Add shape palette handler
     document.querySelectorAll('.shape-icon').forEach(icon => {
-      icon.addEventListener(isMobile ? 'touchstart' : 'click', (e) => {
-        if(isMobile) e.preventDefault();
+      icon.addEventListener('click', (e) => {
+        e.preventDefault();
         
-        // spawn new shape on canvas center
         const shapeKey = icon.dataset.shape;
         const div = document.createElement('div');
         div.className = 'canvas-shape';
@@ -106,19 +103,35 @@
         div.style.fill = selectedColor;
         canvas.appendChild(div);
 
+        // Initialize transform properties
+        div._scale = 1;
+        div._rot = 0;
+        div._currentScale = 1;
+        div._currentRot = 0;
+
         // Touch/pointer event handling
-        let isDragging = false, startX, startY, origX, origY;
-        
+        let isDragging = false;
+        let isPinching = false;
+        let startX, startY, origX, origY;
+        let startDist, startAngle, origScale, origRotate;
+
         const handleStart = (e) => {
           e.preventDefault();
-          isDragging = true;
-          const clientX = e.clientX || e.touches[0].clientX;
-          const clientY = e.clientY || e.touches[0].clientY;
+          const touches = e.touches || [e];
           
-          startX = clientX;
-          startY = clientY;
-          origX = parseFloat(div.style.left);
-          origY = parseFloat(div.style.top);
+          if (touches.length === 1) {
+            isDragging = true;
+            startX = touches[0].clientX;
+            startY = touches[0].clientY;
+            origX = parseFloat(div.style.left);
+            origY = parseFloat(div.style.top);
+          } else if (touches.length === 2) {
+            isPinching = true;
+            startDist = getDist(touches);
+            startAngle = getAngle(touches);
+            origScale = div._scale || 1;
+            origRotate = div._rot || 0;
+          }
           
           if(e.pointerId !== undefined) {
             div.setPointerCapture(e.pointerId);
@@ -126,36 +139,64 @@
         };
         
         const handleMove = (e) => {
-          if (!isDragging) return;
           e.preventDefault();
+          const touches = e.touches || [e];
           
-          const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-          const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-          
-          if(clientX === undefined || clientY === undefined) return;
-          
-          const dx = clientX - startX;
-          const dy = clientY - startY;
-          
-          div.style.left = `${origX + dx}px`;
-          div.style.top = `${origY + dy}px`;
+          if (touches.length === 1 && isDragging) {
+            const dx = touches[0].clientX - startX;
+            const dy = touches[0].clientY - startY;
+            div.style.left = `${origX + dx}px`;
+            div.style.top = `${origY + dy}px`;
+          } 
+          else if (touches.length === 2 && isPinching) {
+            const newDist = getDist(touches);
+            const newAngle = getAngle(touches);
+            const scale = origScale * (newDist / startDist);
+            const rotate = origRotate + (newAngle - startAngle);
+            applyTransform(div, scale, rotate);
+          }
         };
         
-        const handleEnd = () => {
+        const handleEnd = (e) => {
           isDragging = false;
+          isPinching = false;
+          if (div._currentScale) div._scale = div._currentScale;
+          if (div._currentRot) div._rot = div._currentRot;
+          
+          if(e.pointerId !== undefined) {
+            div.releasePointerCapture(e.pointerId);
+          }
         };
-        
-        // Add both touch and pointer events
-        if(isMobile) {
-          div.addEventListener('touchstart', handleStart, {passive: false});
-          div.addEventListener('touchmove', handleMove, {passive: false});
-          div.addEventListener('touchend', handleEnd);
-        } else {
-          div.addEventListener('pointerdown', handleStart);
-          div.addEventListener('pointermove', handleMove);
-          div.addEventListener('pointerup', handleEnd);
-          div.addEventListener('pointercancel', handleEnd);
+
+        // Helper functions
+        function getDist(touches) {
+          const dx = touches[0].clientX - touches[1].clientX;
+          const dy = touches[0].clientY - touches[1].clientY;
+          return Math.hypot(dx, dy);
         }
+
+        function getAngle(touches) {
+          const dx = touches[1].clientX - touches[0].clientX;
+          const dy = touches[1].clientY - touches[0].clientY;
+          return Math.atan2(dy, dx) * (180 / Math.PI);
+        }
+
+        function applyTransform(el, scale, rotation) {
+          const currentX = parseFloat(el.style.left) + 40;
+          const currentY = parseFloat(el.style.top) + 40;
+          el.style.transform = `translate(0,0) scale(${scale}) rotate(${rotation}deg)`;
+          el._currentScale = scale;
+          el._currentRot = rotation;
+        }
+
+        // Add event listeners
+        div.addEventListener('touchstart', handleStart, { passive: false });
+        div.addEventListener('touchmove', handleMove, { passive: false });
+        div.addEventListener('touchend', handleEnd);
+        div.addEventListener('pointerdown', handleStart);
+        div.addEventListener('pointermove', handleMove);
+        div.addEventListener('pointerup', handleEnd);
+        div.addEventListener('pointercancel', handleEnd);
       });
     });
   </script>
