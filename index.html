@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.2.1 (Smooth Interactions)</title>
+  <title>DooDo v0.3 (Double-Tap Duplicate)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -45,7 +45,7 @@
       user-select:none;
       -webkit-user-select:none;
       transform-origin: center center;
-      will-change: transform; /* Optimize for smooth animations */
+      will-change: transform;
     }
   </style>
 </head>
@@ -119,6 +119,7 @@
       let startTouches = [];
       let origState = {};
       let dragging = false;
+      let lastTap = 0;
 
       div.addEventListener('touchstart', e => {
         e.preventDefault();
@@ -161,6 +162,18 @@
       }, { passive: false });
 
       div.addEventListener('touchend', e => {
+        const now = Date.now();
+        if (now - lastTap < 300 && !dragging && e.touches.length === 0) {
+          // Double-tap detected: clone the shape
+          const clone = createShape(shapeKey); 
+          clone._x = div._x + 20;
+          clone._y = div._y + 20;
+          clone._scale = div._scale;
+          clone._rotation = div._rotation;
+          clone.style.fill = div.style.fill;
+          updateTransform(clone);
+        }
+        lastTap = now;
         dragging = false;
         startTouches = [];
       });
