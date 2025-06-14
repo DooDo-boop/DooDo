@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.7 (Proper Undo)</title>
+  <title>DooDo v0.3.8 (fixed Undo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -96,7 +96,7 @@
     let selectedShape = null;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const shapeHistory = [];
-    const redoStack = []; // For future redo functionality
+    const redoStack = [];
 
     // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(swatch => {
@@ -110,7 +110,7 @@
           const shapeEl = selectedShape.querySelector('svg > *');
           if (shapeEl) {
             shapeEl.setAttribute('fill', selectedColor);
-            // Update color in history if this shape exists there
+            // Update color in history
             const historyItem = shapeHistory.find(item => item.domRef === selectedShape);
             if (historyItem) historyItem.color = selectedColor;
           }
@@ -130,14 +130,40 @@
     // Undo button handler
     document.getElementById('undo-btn').addEventListener('click', () => {
       if (shapeHistory.length > 0) {
-        const lastAction = shapeHistory.pop();
-        if (lastAction.domRef && lastAction.domRef.parentNode) {
-          lastAction.domRef.remove();
-          if (selectedShape === lastAction.domRef) {
-            selectedShape = null;
-          }
-          // Push to redo stack for future implementation
-          redoStack.push(lastAction);
+        const lastAction = shapeHistory[shapeHistory.length - 1];
+        
+        if (lastAction.isDeleted) {
+          // Recreate deleted shape
+          const recreatedShape = createShape(lastAction.type, {
+            x: lastAction.x,
+            y: lastAction.y,
+            scale: lastAction.scale,
+            rotation: lastAction.rotation,
+            color: lastAction.color
+          });
+          // Update history reference
+          lastAction.domRef = recreatedShape;
+          lastAction.isDeleted = false;
+          redoStack.push(shapeHistory.pop());
+        } else if (lastAction.domRef && lastAction.domRef.parentNode) {
+          // Delete existing shape
+          lastAction.domRef.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+          lastAction.domRef.style.transform = `${lastAction.domRef.style.transform} scale(0.1)`;
+          lastAction.domRef.style.opacity = '0';
+          
+          setTimeout(() => {
+            if (lastAction.domRef.parentNode) {
+              lastAction.domRef.remove();
+              lastAction.isDeleted = true;
+              if (selectedShape === lastAction.domRef) {
+                selectedShape = null;
+              }
+              redoStack.push(shapeHistory.pop());
+            }
+          }, 300);
+        } else {
+          // Clean up invalid references
+          shapeHistory.pop();
         }
       }
     });
@@ -160,7 +186,7 @@
       updateTransform(div);
       canvas.appendChild(div);
 
-      // Save to history if this is a new shape (not being recreated)
+      // Only add to history if this is a brand new shape (not being recreated for undo)
       if (!savedState) {
         shapeHistory.push({
           type: shapeKey,
@@ -169,7 +195,8 @@
           scale: div._scale,
           rotation: div._rotation,
           color: fillColor,
-          domRef: div
+          domRef: div,
+          isDeleted: false
         });
       }
 
@@ -203,10 +230,11 @@
             setTimeout(() => {
               if (div.parentNode) {
                 div.remove();
-                // Remove from history if deleting
-                const index = shapeHistory.findIndex(item => item.domRef === div);
-                if (index > -1) {
-                  shapeHistory.splice(index, 1);
+                // Mark as deleted in history
+                const historyItem = shapeHistory.find(item => item.domRef === div);
+                if (historyItem) {
+                  historyItem.isDeleted = true;
+                  historyItem.domRef = null;
                 }
                 if (selectedShape === div) {
                   selectedShape = null;
@@ -231,7 +259,7 @@
           origState.startDist = getDist(startTouches);
           origState.startAngle = getAngle(startTouches);
         }
-        canvas.appendChild(div); // bring to front
+        canvas.appendChild(div);
       }, { passive: false });
 
       div.addEventListener('touchmove', e => {
