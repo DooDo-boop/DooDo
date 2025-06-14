@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.4 (Fixed Rotation/Deletion)</title>
+  <title>DooDo v0.3.5 (Precise Deletion)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -136,24 +136,28 @@
       let lastTap = 0;
       let gestureInProgress = false;
       let longPressTimer = null;
+      let hasMoved = false;
 
       div.addEventListener('touchstart', e => {
         e.preventDefault();
+        hasMoved = false;
         
         // Set up long press timer
         longPressTimer = setTimeout(() => {
-          // Shrink and fade animation
-          div.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-          div.style.transform = `${div.style.transform} scale(0.1)`;
-          div.style.opacity = '0';
+          if (!hasMoved) {  // Only delete if no movement detected
+            // Shrink and fade animation
+            div.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+            div.style.transform = `${div.style.transform} scale(0.1)`;
+            div.style.opacity = '0';
 
-          // Remove after animation completes
-          setTimeout(() => {
-            div.remove();
-            if (selectedShape === div) {
-              selectedShape = null;
-            }
-          }, 300);
+            // Remove after animation completes
+            setTimeout(() => {
+              div.remove();
+              if (selectedShape === div) {
+                selectedShape = null;
+              }
+            }, 300);
+          }
         }, 600);
 
         if (e.touches.length === 1) {
@@ -176,8 +180,9 @@
 
       div.addEventListener('touchmove', e => {
         e.preventDefault();
+        hasMoved = true;
         gestureInProgress = true;
-        clearTimeout(longPressTimer); // Cancel long press if moving
+        clearTimeout(longPressTimer);
         
         if (e.touches.length === 1 && dragging) {
           const touch = e.touches[0];
@@ -198,13 +203,14 @@
       }, { passive: false });
 
       div.addEventListener('touchend', e => {
-        clearTimeout(longPressTimer); // Always clear the timer on release
+        clearTimeout(longPressTimer);
         
-        if (gestureInProgress) {
+        if (gestureInProgress || hasMoved) {
           gestureInProgress = false;
+          hasMoved = false;
           dragging = false;
           startTouches = [];
-          return; // Skip all other touch end logic if gesture was in progress
+          return;
         }
 
         const now = Date.now();
@@ -227,7 +233,7 @@
           return;
         }
 
-        // Select this shape (only if not dragging and no gesture)
+        // Select this shape (only if not dragging and no movement)
         if (!dragging && e.touches.length === 0) {
           if (selectedShape) {
             selectedShape.classList.remove('selected');
