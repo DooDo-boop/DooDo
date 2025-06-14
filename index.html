@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.2 (Fixed Rotation Issues)</title>
+  <title>DooDo v0.3.3 (Long Press Delete)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -46,6 +46,7 @@
       -webkit-user-select:none;
       transform-origin: center center;
       will-change: transform;
+      transition: none; /* Initially no transition */
     }
     .canvas-shape.selected {
       outline: 2px dashed black;
@@ -134,9 +135,27 @@
       let dragging = false;
       let lastTap = 0;
       let gestureInProgress = false;
+      let longPressTimer = null;
 
       div.addEventListener('touchstart', e => {
         e.preventDefault();
+        
+        // Set up long press timer
+        longPressTimer = setTimeout(() => {
+          // Shrink and fade animation
+          div.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+          div.style.transform = `${div.style.transform} scale(0.1)`;
+          div.style.opacity = '0';
+
+          // Remove after animation completes
+          setTimeout(() => {
+            div.remove();
+            if (selectedShape === div) {
+              selectedShape = null;
+            }
+          }, 300);
+        }, 600);
+
         if (e.touches.length === 1) {
           dragging = true;
           const touch = e.touches[0];
@@ -158,6 +177,7 @@
       div.addEventListener('touchmove', e => {
         e.preventDefault();
         gestureInProgress = true;
+        clearTimeout(longPressTimer); // Cancel long press if moving
         
         if (e.touches.length === 1 && dragging) {
           const touch = e.touches[0];
@@ -178,6 +198,8 @@
       }, { passive: false });
 
       div.addEventListener('touchend', e => {
+        clearTimeout(longPressTimer); // Cancel long press on release
+        
         if (gestureInProgress) {
           gestureInProgress = false;
           dragging = false;
