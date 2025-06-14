@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.1 (Shape Coloring)</title>
+  <title>DooDo v0.3.2 (Fixed Rotation Issues)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -133,6 +133,7 @@
       let origState = {};
       let dragging = false;
       let lastTap = 0;
+      let gestureInProgress = false;
 
       div.addEventListener('touchstart', e => {
         e.preventDefault();
@@ -156,6 +157,8 @@
 
       div.addEventListener('touchmove', e => {
         e.preventDefault();
+        gestureInProgress = true;
+        
         if (e.touches.length === 1 && dragging) {
           const touch = e.touches[0];
           const dx = touch.clientX - origState.startX;
@@ -175,6 +178,13 @@
       }, { passive: false });
 
       div.addEventListener('touchend', e => {
+        if (gestureInProgress) {
+          gestureInProgress = false;
+          dragging = false;
+          startTouches = [];
+          return;
+        }
+
         const now = Date.now();
         
         // Double-tap check (duplicate logic)
