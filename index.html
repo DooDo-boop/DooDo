@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.8 (Complete Undo)</title>
+  <title>DooDo v0.3.9 (Perfect Undo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -129,16 +129,24 @@
       });
     });
 
-    // Undo button handler
+    // Undo button handler - NOW WORKS WITH SINGLE TAP
     document.getElementById('undo-btn').addEventListener('click', () => {
-      if (currentStateIndex > 0) {
-        currentStateIndex--;
-        restoreState();
+      if (canUndo()) {
+        undo();
       }
     });
 
+    function canUndo() {
+      return stateHistory.length > 1 && currentStateIndex > 0;
+    }
+
+    function undo() {
+      currentStateIndex--;
+      restoreState();
+    }
+
     function saveState() {
-      // Clear any future states if we're not at the end
+      // If we're not at the end of history, prune future states
       if (currentStateIndex < stateHistory.length - 1) {
         stateHistory.length = currentStateIndex + 1;
       }
@@ -353,7 +361,7 @@
           if (selectedShape === shape) {
             selectedShape = null;
           }
-          saveState();
+          saveState(); // Save state after deletion
         }
       }, 300);
     }
