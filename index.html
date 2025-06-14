@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.6 (With Undo)</title>
+  <title>DooDo v0.3.7 (Proper Undo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -96,6 +96,7 @@
     let selectedShape = null;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const shapeHistory = [];
+    const redoStack = []; // For future redo functionality
 
     // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(swatch => {
@@ -107,7 +108,12 @@
 
         if (selectedShape) {
           const shapeEl = selectedShape.querySelector('svg > *');
-          if (shapeEl) shapeEl.setAttribute('fill', selectedColor);
+          if (shapeEl) {
+            shapeEl.setAttribute('fill', selectedColor);
+            // Update color in history if this shape exists there
+            const historyItem = shapeHistory.find(item => item.domRef === selectedShape);
+            if (historyItem) historyItem.color = selectedColor;
+          }
         }
       });
     });
@@ -123,35 +129,49 @@
 
     // Undo button handler
     document.getElementById('undo-btn').addEventListener('click', () => {
-      const lastShape = shapeHistory.pop();
-      if (lastShape && lastShape.parentNode) {
-        lastShape.remove();
-        if (selectedShape === lastShape) {
-          selectedShape = null;
+      if (shapeHistory.length > 0) {
+        const lastAction = shapeHistory.pop();
+        if (lastAction.domRef && lastAction.domRef.parentNode) {
+          lastAction.domRef.remove();
+          if (selectedShape === lastAction.domRef) {
+            selectedShape = null;
+          }
+          // Push to redo stack for future implementation
+          redoStack.push(lastAction);
         }
       }
     });
 
-    function createShape(shapeKey) {
+    function createShape(shapeKey, savedState = null) {
       const div = document.createElement('div');
       div.className = 'canvas-shape';
       div.innerHTML = shapeSVGs[shapeKey];
-      div.style.position = 'absolute';
       
-      // Center the shape initially
-      const rect = canvas.getBoundingClientRect();
-      div._x = rect.width / 2 - 40;
-      div._y = rect.height / 2 - 40;
-      div._scale = 1;
-      div._rotation = 0;
-      
-      // Set initial color
-      const shapeElement = div.querySelector('svg > *');
-      if (shapeElement) shapeElement.setAttribute('fill', selectedColor);
+      // Initialize with saved state or defaults
+      div._x = savedState?.x || (canvas.getBoundingClientRect().width / 2 - 40);
+      div._y = savedState?.y || (canvas.getBoundingClientRect().height / 2 - 40);
+      div._scale = savedState?.scale || 1;
+      div._rotation = savedState?.rotation || 0;
+      const fillColor = savedState?.color || selectedColor;
 
+      // Set initial properties
+      const shapeElement = div.querySelector('svg > *');
+      if (shapeElement) shapeElement.setAttribute('fill', fillColor);
       updateTransform(div);
       canvas.appendChild(div);
-      shapeHistory.push(div); // Add to history stack
+
+      // Save to history if this is a new shape (not being recreated)
+      if (!savedState) {
+        shapeHistory.push({
+          type: shapeKey,
+          x: div._x,
+          y: div._y,
+          scale: div._scale,
+          rotation: div._rotation,
+          color: fillColor,
+          domRef: div
+        });
+      }
 
       // Bring to front on tap
       div.addEventListener('pointerdown', () => {
@@ -184,7 +204,7 @@
               if (div.parentNode) {
                 div.remove();
                 // Remove from history if deleting
-                const index = shapeHistory.indexOf(div);
+                const index = shapeHistory.findIndex(item => item.domRef === div);
                 if (index > -1) {
                   shapeHistory.splice(index, 1);
                 }
@@ -227,6 +247,13 @@
           div._x = origState.x + dx;
           div._y = origState.y + dy;
           updateTransform(div);
+          
+          // Update position in history
+          const historyItem = shapeHistory.find(item => item.domRef === div);
+          if (historyItem) {
+            historyItem.x = div._x;
+            historyItem.y = div._y;
+          }
         } else if (e.touches.length === 2 && startTouches.length === 2) {
           const newDist = getDist(e.touches);
           const newAngle = getAngle(e.touches);
@@ -235,6 +262,13 @@
           div._scale = scale;
           div._rotation = rotation;
           updateTransform(div);
+          
+          // Update scale/rotation in history
+          const historyItem = shapeHistory.find(item => item.domRef === div);
+          if (historyItem) {
+            historyItem.scale = div._scale;
+            historyItem.rotation = div._rotation;
+          }
         }
       }, { passive: false });
 
@@ -253,19 +287,13 @@
         
         // Double-tap check
         if (now - lastTap < 300 && !dragging && e.touches.length === 0) {
-          const clone = createShape(shapeKey);
-          clone._x = div._x + 20;
-          clone._y = div._y + 20;
-          clone._scale = div._scale;
-          clone._rotation = div._rotation;
-          updateTransform(clone);
-          
-          // Copy color to clone
-          const originalShape = div.querySelector('svg > *');
-          const clonedShape = clone.querySelector('svg > *');
-          if (originalShape && clonedShape) {
-            clonedShape.setAttribute('fill', originalShape.getAttribute('fill'));
-          }
+          const clone = createShape(shapeKey, {
+            x: div._x + 20,
+            y: div._y + 20,
+            scale: div._scale,
+            rotation: div._rotation,
+            color: div.querySelector('svg > *')?.getAttribute('fill') || selectedColor
+          });
           return;
         }
 
@@ -302,6 +330,13 @@
         div._x = origState.x + dx;
         div._y = origState.y + dy;
         updateTransform(div);
+        
+        // Update position in history
+        const historyItem = shapeHistory.find(item => item.domRef === div);
+        if (historyItem) {
+          historyItem.x = div._x;
+          historyItem.y = div._y;
+        }
       });
 
       div.addEventListener('pointerup', (e) => {
