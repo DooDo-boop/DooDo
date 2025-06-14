@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.9 (Perfect Undo)</title>
+  <title>DooDo v0.3.9 (Reliable Single-Tap Undo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -101,7 +101,7 @@
     let currentStateIndex = -1;
     
     // Initialize with empty state
-    saveState();
+    saveState(true);
 
     // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(swatch => {
@@ -129,29 +129,34 @@
       });
     });
 
-    // Undo button handler - NOW WORKS WITH SINGLE TAP
+    // Undo button handler - SINGLE TAP WORKS EVERY TIME
     document.getElementById('undo-btn').addEventListener('click', () => {
-      if (canUndo()) {
-        undo();
+      if (stateHistory.length > 1 && currentStateIndex > 0) {
+        currentStateIndex--;
+        restoreState();
+        // After undo, we need to ensure next saveState doesn't create duplicate
+        stateHistory.length = currentStateIndex + 1;
       }
     });
 
-    function canUndo() {
-      return stateHistory.length > 1 && currentStateIndex > 0;
-    }
-
-    function undo() {
-      currentStateIndex--;
-      restoreState();
-    }
-
-    function saveState() {
+    function saveState(initial = false) {
+      // Don't save duplicate states
+      if (!initial && stateHistory.length > 0) {
+        const currentState = JSON.stringify(stateHistory[currentStateIndex]);
+        const newState = JSON.stringify(getCurrentShapes());
+        if (currentState === newState) return;
+      }
+      
       // If we're not at the end of history, prune future states
       if (currentStateIndex < stateHistory.length - 1) {
         stateHistory.length = currentStateIndex + 1;
       }
       
-      // Capture current canvas state
+      stateHistory.push(getCurrentShapes());
+      currentStateIndex = stateHistory.length - 1;
+    }
+
+    function getCurrentShapes() {
       const shapes = [];
       document.querySelectorAll('.canvas-shape').forEach(shape => {
         shapes.push({
@@ -164,9 +169,7 @@
           color: shape.querySelector('svg > *')?.getAttribute('fill') || selectedColor
         });
       });
-      
-      stateHistory.push(shapes);
-      currentStateIndex = stateHistory.length - 1;
+      return shapes;
     }
 
     function restoreState() {
@@ -282,7 +285,7 @@
           hasMoved = false;
           dragging = false;
           startTouches = [];
-          saveState(); // Save state after movement
+          saveState();
           return;
         }
 
@@ -344,7 +347,7 @@
           selectedShape = div;
           div.classList.add('selected');
         } else {
-          saveState(); // Save state after movement
+          saveState();
         }
         dragging = false;
       });
@@ -361,7 +364,7 @@
           if (selectedShape === shape) {
             selectedShape = null;
           }
-          saveState(); // Save state after deletion
+          saveState();
         }
       }, 300);
     }
