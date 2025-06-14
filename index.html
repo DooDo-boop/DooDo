@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.8 (fixed Undo)</title>
+  <title>DooDo v0.3.8 (Fixed Undo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -95,8 +95,12 @@
     let selectedColor = '#2E3192';
     let selectedShape = null;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const shapeHistory = [];
-    const redoStack = [];
+    
+    // Track all actions in order
+    const actionHistory = [];
+    
+    // Track all existing shapes
+    const allShapes = new Set();
 
     // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(swatch => {
@@ -108,12 +112,7 @@
 
         if (selectedShape) {
           const shapeEl = selectedShape.querySelector('svg > *');
-          if (shapeEl) {
-            shapeEl.setAttribute('fill', selectedColor);
-            // Update color in history
-            const historyItem = shapeHistory.find(item => item.domRef === selectedShape);
-            if (historyItem) historyItem.color = selectedColor;
-          }
+          if (shapeEl) shapeEl.setAttribute('fill', selectedColor);
         }
       });
     });
@@ -129,77 +128,62 @@
 
     // Undo button handler
     document.getElementById('undo-btn').addEventListener('click', () => {
-      if (shapeHistory.length > 0) {
-        const lastAction = shapeHistory[shapeHistory.length - 1];
+      if (actionHistory.length > 0) {
+        const lastAction = actionHistory.pop();
         
-        if (lastAction.isDeleted) {
-          // Recreate deleted shape
-          const recreatedShape = createShape(lastAction.type, {
-            x: lastAction.x,
-            y: lastAction.y,
-            scale: lastAction.scale,
-            rotation: lastAction.rotation,
-            color: lastAction.color
-          });
-          // Update history reference
-          lastAction.domRef = recreatedShape;
-          lastAction.isDeleted = false;
-          redoStack.push(shapeHistory.pop());
-        } else if (lastAction.domRef && lastAction.domRef.parentNode) {
-          // Delete existing shape
-          lastAction.domRef.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-          lastAction.domRef.style.transform = `${lastAction.domRef.style.transform} scale(0.1)`;
-          lastAction.domRef.style.opacity = '0';
-          
-          setTimeout(() => {
-            if (lastAction.domRef.parentNode) {
-              lastAction.domRef.remove();
-              lastAction.isDeleted = true;
-              if (selectedShape === lastAction.domRef) {
-                selectedShape = null;
-              }
-              redoStack.push(shapeHistory.pop());
-            }
-          }, 300);
-        } else {
-          // Clean up invalid references
-          shapeHistory.pop();
+        if (lastAction.type === 'create') {
+          // Undo creation = delete the shape
+          if (lastAction.shape && lastAction.shape.parentNode) {
+            animateDelete(lastAction.shape, false);
+          }
+        } else if (lastAction.type === 'delete') {
+          // Undo deletion = recreate the shape
+          recreateShape(lastAction.shapeData);
         }
       }
     });
 
-    function createShape(shapeKey, savedState = null) {
+    function createShape(shapeKey, shapeData = null) {
       const div = document.createElement('div');
       div.className = 'canvas-shape';
       div.innerHTML = shapeSVGs[shapeKey];
       
-      // Initialize with saved state or defaults
-      div._x = savedState?.x || (canvas.getBoundingClientRect().width / 2 - 40);
-      div._y = savedState?.y || (canvas.getBoundingClientRect().height / 2 - 40);
-      div._scale = savedState?.scale || 1;
-      div._rotation = savedState?.rotation || 0;
-      const fillColor = savedState?.color || selectedColor;
+      // Initialize with provided data or defaults
+      div._x = shapeData?.x || (canvas.getBoundingClientRect().width / 2 - 40);
+      div._y = shapeData?.y || (canvas.getBoundingClientRect().height / 2 - 40);
+      div._scale = shapeData?.scale || 1;
+      div._rotation = shapeData?.rotation || 0;
+      const fillColor = shapeData?.color || selectedColor;
 
       // Set initial properties
       const shapeElement = div.querySelector('svg > *');
       if (shapeElement) shapeElement.setAttribute('fill', fillColor);
       updateTransform(div);
       canvas.appendChild(div);
+      allShapes.add(div);
 
-      // Only add to history if this is a brand new shape (not being recreated for undo)
-      if (!savedState) {
-        shapeHistory.push({
-          type: shapeKey,
-          x: div._x,
-          y: div._y,
-          scale: div._scale,
-          rotation: div._rotation,
-          color: fillColor,
-          domRef: div,
-          isDeleted: false
+      // Only record creation action if this is a new shape (not undo recreation)
+      if (!shapeData) {
+        actionHistory.push({
+          type: 'create',
+          shape: div,
+          shapeData: {
+            type: shapeKey,
+            x: div._x,
+            y: div._y,
+            scale: div._scale,
+            rotation: div._rotation,
+            color: fillColor
+          }
         });
       }
 
+      // Add interaction handlers
+      setupShapeInteractions(div, shapeKey);
+      return div;
+    }
+
+    function setupShapeInteractions(div, shapeKey) {
       // Bring to front on tap
       div.addEventListener('pointerdown', () => {
         canvas.appendChild(div);
@@ -221,26 +205,7 @@
         // Set up long press timer
         longPressTimer = setTimeout(() => {
           if (!hasMoved) {
-            // Shrink and fade animation
-            div.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-            div.style.transform = `${div.style.transform} scale(0.1)`;
-            div.style.opacity = '0';
-
-            // Remove after animation completes
-            setTimeout(() => {
-              if (div.parentNode) {
-                div.remove();
-                // Mark as deleted in history
-                const historyItem = shapeHistory.find(item => item.domRef === div);
-                if (historyItem) {
-                  historyItem.isDeleted = true;
-                  historyItem.domRef = null;
-                }
-                if (selectedShape === div) {
-                  selectedShape = null;
-                }
-              }
-            }, 300);
+            animateDelete(div, true);
           }
         }, 600);
 
@@ -275,13 +240,6 @@
           div._x = origState.x + dx;
           div._y = origState.y + dy;
           updateTransform(div);
-          
-          // Update position in history
-          const historyItem = shapeHistory.find(item => item.domRef === div);
-          if (historyItem) {
-            historyItem.x = div._x;
-            historyItem.y = div._y;
-          }
         } else if (e.touches.length === 2 && startTouches.length === 2) {
           const newDist = getDist(e.touches);
           const newAngle = getAngle(e.touches);
@@ -290,13 +248,6 @@
           div._scale = scale;
           div._rotation = rotation;
           updateTransform(div);
-          
-          // Update scale/rotation in history
-          const historyItem = shapeHistory.find(item => item.domRef === div);
-          if (historyItem) {
-            historyItem.scale = div._scale;
-            historyItem.rotation = div._rotation;
-          }
         }
       }, { passive: false });
 
@@ -358,13 +309,6 @@
         div._x = origState.x + dx;
         div._y = origState.y + dy;
         updateTransform(div);
-        
-        // Update position in history
-        const historyItem = shapeHistory.find(item => item.domRef === div);
-        if (historyItem) {
-          historyItem.x = div._x;
-          historyItem.y = div._y;
-        }
       });
 
       div.addEventListener('pointerup', (e) => {
@@ -377,8 +321,42 @@
         }
         dragging = false;
       });
+    }
 
-      return div;
+    function animateDelete(shape, addToHistory) {
+      shape.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+      shape.style.transform = `${shape.style.transform} scale(0.1)`;
+      shape.style.opacity = '0';
+
+      setTimeout(() => {
+        if (shape.parentNode) {
+          shape.remove();
+          allShapes.delete(shape);
+          
+          if (addToHistory) {
+            actionHistory.push({
+              type: 'delete',
+              shapeData: {
+                type: shape.innerHTML.includes('circle') ? 'circle' : 
+                      shape.innerHTML.includes('rect') ? 'rect' : 'triangle',
+                x: shape._x,
+                y: shape._y,
+                scale: shape._scale,
+                rotation: shape._rotation,
+                color: shape.querySelector('svg > *')?.getAttribute('fill') || selectedColor
+              }
+            });
+          }
+          
+          if (selectedShape === shape) {
+            selectedShape = null;
+          }
+        }
+      }, 300);
+    }
+
+    function recreateShape(shapeData) {
+      createShape(shapeData.type, shapeData);
     }
 
     function updateTransform(el) {
