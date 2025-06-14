@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.2 (Pinch Enabled)</title>
+  <title>DooDo v0.2.1 (Smooth Interactions)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -45,6 +45,7 @@
       user-select:none;
       -webkit-user-select:none;
       transform-origin: center center;
+      will-change: transform; /* Optimize for smooth animations */
     }
   </style>
 </head>
@@ -77,7 +78,7 @@
     document.querySelectorAll('.color-swatch').forEach(s => {
       s.addEventListener('click', (e) => {
         e.preventDefault();
-        document.querySelectorAll('.color-swatch').forEach(x=>x.style.border='2px solid #ccc');
+        document.querySelectorAll('.color-swatch').forEach(x => x.style.border = '2px solid #ccc');
         s.style.border = '2px solid #000';
         selectedColor = s.dataset.color;
       });
@@ -87,118 +88,126 @@
     document.querySelectorAll('.shape-icon').forEach(icon => {
       icon.addEventListener('click', (e) => {
         e.preventDefault();
-        
         const shapeKey = icon.dataset.shape;
-        const div = document.createElement('div');
-        div.className = 'canvas-shape';
-        div.innerHTML = shapeSVGs[shapeKey];
-        
-        // Center the shape
-        const rect = canvas.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        
-        div.style.left = `${centerX - 40}px`;
-        div.style.top = `${centerY - 40}px`;
-        div.style.fill = selectedColor;
-        canvas.appendChild(div);
-
-        // Initialize transform properties
-        div._scale = 1;
-        div._rot = 0;
-        div._currentScale = 1;
-        div._currentRot = 0;
-
-        // Touch/pointer event handling
-        let isDragging = false;
-        let isPinching = false;
-        let startX, startY, origX, origY;
-        let startDist, startAngle, origScale, origRotate;
-
-        const handleStart = (e) => {
-          e.preventDefault();
-          const touches = e.touches || [e];
-          
-          if (touches.length === 1) {
-            isDragging = true;
-            startX = touches[0].clientX;
-            startY = touches[0].clientY;
-            origX = parseFloat(div.style.left);
-            origY = parseFloat(div.style.top);
-          } else if (touches.length === 2) {
-            isPinching = true;
-            startDist = getDist(touches);
-            startAngle = getAngle(touches);
-            origScale = div._scale || 1;
-            origRotate = div._rot || 0;
-          }
-          
-          if(e.pointerId !== undefined) {
-            div.setPointerCapture(e.pointerId);
-          }
-        };
-        
-        const handleMove = (e) => {
-          e.preventDefault();
-          const touches = e.touches || [e];
-          
-          if (touches.length === 1 && isDragging) {
-            const dx = touches[0].clientX - startX;
-            const dy = touches[0].clientY - startY;
-            div.style.left = `${origX + dx}px`;
-            div.style.top = `${origY + dy}px`;
-          } 
-          else if (touches.length === 2 && isPinching) {
-            const newDist = getDist(touches);
-            const newAngle = getAngle(touches);
-            const scale = origScale * (newDist / startDist);
-            const rotate = origRotate + (newAngle - startAngle);
-            applyTransform(div, scale, rotate);
-          }
-        };
-        
-        const handleEnd = (e) => {
-          isDragging = false;
-          isPinching = false;
-          if (div._currentScale) div._scale = div._currentScale;
-          if (div._currentRot) div._rot = div._currentRot;
-          
-          if(e.pointerId !== undefined) {
-            div.releasePointerCapture(e.pointerId);
-          }
-        };
-
-        // Helper functions
-        function getDist(touches) {
-          const dx = touches[0].clientX - touches[1].clientX;
-          const dy = touches[0].clientY - touches[1].clientY;
-          return Math.hypot(dx, dy);
-        }
-
-        function getAngle(touches) {
-          const dx = touches[1].clientX - touches[0].clientX;
-          const dy = touches[1].clientY - touches[0].clientY;
-          return Math.atan2(dy, dx) * (180 / Math.PI);
-        }
-
-        function applyTransform(el, scale, rotation) {
-          const currentX = parseFloat(el.style.left) + 40;
-          const currentY = parseFloat(el.style.top) + 40;
-          el.style.transform = `translate(0,0) scale(${scale}) rotate(${rotation}deg)`;
-          el._currentScale = scale;
-          el._currentRot = rotation;
-        }
-
-        // Add event listeners
-        div.addEventListener('touchstart', handleStart, { passive: false });
-        div.addEventListener('touchmove', handleMove, { passive: false });
-        div.addEventListener('touchend', handleEnd);
-        div.addEventListener('pointerdown', handleStart);
-        div.addEventListener('pointermove', handleMove);
-        div.addEventListener('pointerup', handleEnd);
-        div.addEventListener('pointercancel', handleEnd);
+        createShape(shapeKey);
       });
     });
+
+    function createShape(shapeKey) {
+      const div = document.createElement('div');
+      div.className = 'canvas-shape';
+      div.innerHTML = shapeSVGs[shapeKey];
+      div.style.position = 'absolute';
+      
+      // Center the shape initially
+      const rect = canvas.getBoundingClientRect();
+      div._x = rect.width / 2 - 40;
+      div._y = rect.height / 2 - 40;
+      div._scale = 1;
+      div._rotation = 0;
+      div.style.fill = selectedColor;
+
+      updateTransform(div);
+      canvas.appendChild(div);
+
+      // Bring to front on tap
+      div.addEventListener('pointerdown', () => {
+        canvas.appendChild(div);
+      });
+
+      // Touch events
+      let startTouches = [];
+      let origState = {};
+      let dragging = false;
+
+      div.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (e.touches.length === 1) {
+          dragging = true;
+          const touch = e.touches[0];
+          origState.x = div._x;
+          origState.y = div._y;
+          origState.startX = touch.clientX;
+          origState.startY = touch.clientY;
+        } else if (e.touches.length === 2) {
+          dragging = false;
+          startTouches = [...e.touches];
+          origState.scale = div._scale;
+          origState.rotation = div._rotation;
+          origState.startDist = getDist(startTouches);
+          origState.startAngle = getAngle(startTouches);
+        }
+        canvas.appendChild(div); // bring to front
+      }, { passive: false });
+
+      div.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (e.touches.length === 1 && dragging) {
+          const touch = e.touches[0];
+          const dx = touch.clientX - origState.startX;
+          const dy = touch.clientY - origState.startY;
+          div._x = origState.x + dx;
+          div._y = origState.y + dy;
+          updateTransform(div);
+        } else if (e.touches.length === 2 && startTouches.length === 2) {
+          const newDist = getDist(e.touches);
+          const newAngle = getAngle(e.touches);
+          const scale = origState.scale * (newDist / origState.startDist);
+          const rotation = origState.rotation + (newAngle - origState.startAngle);
+          div._scale = scale;
+          div._rotation = rotation;
+          updateTransform(div);
+        }
+      }, { passive: false });
+
+      div.addEventListener('touchend', e => {
+        dragging = false;
+        startTouches = [];
+      });
+
+      // Pointer events for desktop
+      div.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        dragging = true;
+        origState.x = div._x;
+        origState.y = div._y;
+        origState.startX = e.clientX;
+        origState.startY = e.clientY;
+        canvas.appendChild(div);
+      });
+
+      div.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        e.preventDefault();
+        const dx = e.clientX - origState.startX;
+        const dy = e.clientY - origState.startY;
+        div._x = origState.x + dx;
+        div._y = origState.y + dy;
+        updateTransform(div);
+      });
+
+      div.addEventListener('pointerup', () => {
+        dragging = false;
+      });
+
+      return div;
+    }
+
+    function updateTransform(el) {
+      el.style.transform = `translate(${el._x}px, ${el._y}px) scale(${el._scale}) rotate(${el._rotation}deg)`;
+    }
+
+    function getDist(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    function getAngle(touches) {
+      const dx = touches[1].clientX - touches[0].clientX;
+      const dy = touches[1].clientY - touches[0].clientY;
+      return Math.atan2(dy, dx) * (180 / Math.PI);
+    }
   </script>
 </body>
 </html>
