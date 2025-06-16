@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.4.2 (Polished)</title>
+  <title>DooDo v0.4.3 (More Polish)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -224,12 +224,12 @@
     }
 
     function addSelectionOverlay(div) {
-      const svg = div.querySelector('svg');
-      const shape = svg.querySelector('*');
+      const shape = div.querySelector('svg > *');
       shape.setAttribute('stroke', '#000');
-      shape.setAttribute('stroke-width', '3');
+      shape.setAttribute('stroke-width', '2');
       shape.setAttribute('stroke-dasharray', '4 2');
       shape.setAttribute('stroke-linejoin', 'round');
+      shape.setAttribute('vector-effect', 'non-scaling-stroke');
     }
 
     function removeSelectionOverlay(div) {
@@ -239,6 +239,7 @@
         shape.removeAttribute('stroke');
         shape.removeAttribute('stroke-width');
         shape.removeAttribute('stroke-dasharray');
+        shape.removeAttribute('vector-effect');
       }
     }
 
