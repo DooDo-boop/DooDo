@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.3.9 (Reliable Single-Tap Undo)</title>
+  <title>DooDo v0.4 (With Redo)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -51,10 +51,9 @@
     .canvas-shape.selected {
       outline: 2px dashed black;
     }
-    #undo-btn {
+    #undo-btn, #redo-btn {
       position: fixed;
       bottom: 12px;
-      right: 12px;
       z-index: 99;
       padding: 8px 12px;
       background: white;
@@ -63,7 +62,13 @@
       font-family: sans-serif;
       cursor: pointer;
     }
-    #undo-btn:active {
+    #undo-btn {
+      right: 100px;
+    }
+    #redo-btn {
+      right: 12px;
+    }
+    #undo-btn:active, #redo-btn:active {
       background: #f0f0f0;
     }
   </style>
@@ -83,6 +88,7 @@
   </div>
   <div id="canvas"></div>
   <button id="undo-btn">Undo</button>
+  <button id="redo-btn">Redo</button>
 
   <script>
     const shapeSVGs = {
@@ -129,13 +135,21 @@
       });
     });
 
-    // Undo button handler - SINGLE TAP WORKS EVERY TIME
+    // Undo button handler
     document.getElementById('undo-btn').addEventListener('click', () => {
       if (stateHistory.length > 1 && currentStateIndex > 0) {
         currentStateIndex--;
         restoreState();
         // After undo, we need to ensure next saveState doesn't create duplicate
         stateHistory.length = currentStateIndex + 1;
+      }
+    });
+
+    // Redo button handler
+    document.getElementById('redo-btn').addEventListener('click', () => {
+      if (currentStateIndex < stateHistory.length - 1) {
+        currentStateIndex++;
+        restoreState();
       }
     });
 
@@ -154,6 +168,7 @@
       
       stateHistory.push(getCurrentShapes());
       currentStateIndex = stateHistory.length - 1;
+      updateButtonStates();
     }
 
     function getCurrentShapes() {
@@ -184,6 +199,15 @@
       shapes.forEach(shapeData => {
         createShape(shapeData.type, shapeData);
       });
+      updateButtonStates();
+    }
+
+    function updateButtonStates() {
+      // Update undo button state
+      document.getElementById('undo-btn').disabled = stateHistory.length <= 1 || currentStateIndex <= 0;
+      
+      // Update redo button state
+      document.getElementById('redo-btn').disabled = currentStateIndex >= stateHistory.length - 1;
     }
 
     function createShape(shapeKey, shapeData = null) {
@@ -384,6 +408,9 @@
       const dy = touches[1].clientY - touches[0].clientY;
       return Math.atan2(dy, dx) * (180 / Math.PI);
     }
+
+    // Initialize button states
+    updateButtonStates();
   </script>
 </body>
 </html>
