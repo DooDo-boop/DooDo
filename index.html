@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.6.3 (Optimized Chaos)</title>
+  <title>DooDo v0.7 (Chaos Duplication)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -439,13 +439,30 @@
         const now = Date.now();
         
         if (now - lastTap < 300 && !dragging && e.touches.length === 0) {
-          const clone = createShape(shapeKey, {
-            x: div._x + 20,
-            y: div._y + 20,
-            scale: div._scale,
-            rotation: div._rotation,
-            color: div.querySelector('svg > *')?.getAttribute('fill') || selectedColor
-          });
+          if (chaosMode) {
+            // Chaos mode: random direction and distance
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 30 + Math.random() * 20;
+            const dx = Math.cos(angle) * dist;
+            const dy = Math.sin(angle) * dist;
+            
+            const clone = createShape(shapeKey, {
+              x: div._x + dx,
+              y: div._y + dy,
+              scale: div._scale,
+              rotation: div._rotation,
+              color: div.querySelector('svg > *')?.getAttribute('fill') || selectedColor
+            });
+          } else {
+            // Normal mode: fixed offset
+            const clone = createShape(shapeKey, {
+              x: div._x + 20,
+              y: div._y + 20,
+              scale: div._scale,
+              rotation: div._rotation,
+              color: div.querySelector('svg > *')?.getAttribute('fill') || selectedColor
+            });
+          }
           if (!chaosMode) saveState();
           return;
         }
