@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.5.2 (Controlled Chaos)</title>
+  <title>DooDo v0.6.1 (Optimized Layout)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -52,25 +52,27 @@
       outline: 3px dashed #FF0000;
       outline-offset: -3px;
     }
-    #undo-btn, #redo-btn, #export-png {
-      position: fixed;
-      bottom: 12px;
-      z-index: 99;
-      padding: 8px 12px;
+    .tool-button {
+      width: 36px;
+      height: 36px;
       background: white;
       border: 2px solid #ccc;
-      border-radius: 4px;
-      font-family: sans-serif;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
       cursor: pointer;
+      user-select: none;
     }
-    #undo-btn {
-      right: 100px;
-    }
-    #redo-btn {
+    #toolbar {
+      position: fixed;
+      top: 50px; /* Below chaos button */
       right: 12px;
-    }
-    #export-png {
-      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
     }
     #chaos-button {
       position: fixed;
@@ -89,9 +91,6 @@
       cursor: pointer;
       transition: all 0.2s;
     }
-    #undo-btn:active, #redo-btn:active, #export-png:active {
-      background: #f0f0f0;
-    }
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
@@ -107,28 +106,36 @@
       <div class="shape-icon" data-shape="triangle">△</div>
     </div>
     <div id="color-palette">
+      <div class="color-swatch" data-color="rgba(237,28,36,0.56)" style="background:rgba(237,28,36,0.56); border:2px solid #000;"></div>
       <div class="color-swatch" data-color="#2E3192" style="background:#2E3192;"></div>
-      <div class="color-swatch" data-color="rgba(237,28,36,0.56)" style="background:rgba(237,28,36,0.56);"></div>
       <div class="color-swatch" data-color="#FAF073" style="background:#FAF073;"></div>
     </div>
   </div>
   <div id="canvas"></div>
+  
+  <!-- Tools moved to top right below chaos button -->
+  <div id="toolbar">
+    <div id="export-png" class="tool-button" title="Export">🖼️</div>
+    <div id="undo-btn" class="tool-button" title="Undo">↩️</div>
+    <div id="redo-btn" class="tool-button" title="Redo">↪️</div>
+  </div>
+  
   <button id="chaos-button">DON'T PRESS ME</button>
-  <button id="export-png">Export PNG</button>
-  <button id="undo-btn">Undo</button>
-  <button id="redo-btn">Redo</button>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <script>
+    // Bigger default size
+    const DEFAULT_SHAPE_SIZE = 120;
     const shapeSVGs = {
-      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="38"/></svg>',
-      rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
-      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,2 78,78 2,78"/></svg>'
+      circle: `<svg xmlns="http://www.w3.org/2000/svg" width="${DEFAULT_SHAPE_SIZE}" height="${DEFAULT_SHAPE_SIZE}"><circle cx="${DEFAULT_SHAPE_SIZE/2}" cy="${DEFAULT_SHAPE_SIZE/2}" r="${DEFAULT_SHAPE_SIZE/2 - 2}"/></svg>`,
+      rect: `<svg xmlns="http://www.w3.org/2000/svg" width="${DEFAULT_SHAPE_SIZE}" height="${DEFAULT_SHAPE_SIZE}"><rect width="${DEFAULT_SHAPE_SIZE}" height="${DEFAULT_SHAPE_SIZE}"/></svg>`,
+      triangle: `<svg xmlns="http://www.w3.org/2000/svg" width="${DEFAULT_SHAPE_SIZE}" height="${DEFAULT_SHAPE_SIZE}"><polygon points="${DEFAULT_SHAPE_SIZE/2},2 ${DEFAULT_SHAPE_SIZE-2},${DEFAULT_SHAPE_SIZE-2} 2,${DEFAULT_SHAPE_SIZE-2}"/></svg>`
     };
 
     const canvas = document.getElementById('canvas');
-    let selectedColor = '#2E3192';
+    // Default to transparent red
+    let selectedColor = 'rgba(237,28,36,0.56)';
     let selectedShape = null;
     let chaosMode = false;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -140,15 +147,13 @@
     document.getElementById('chaos-button').addEventListener('click', () => {
       chaosMode = !chaosMode;
       const btn = document.getElementById('chaos-button');
-      btn.textContent = chaosMode ? 'CHAOS MODE ON ☠️' : "DON'T PRESS ME";
+      btn.textContent = chaosMode ? 'CHAOS MODE ☠️' : "DON'T PRESS ME";
       btn.style.background = chaosMode ? '#000' : '#ED1C24';
       btn.style.color = chaosMode ? '#FAF073' : 'white';
       btn.style.boxShadow = chaosMode ? '3px 3px 0 #ED1C24' : '2px 2px 0 #000';
       
       // Toggle tool visibility
-      document.getElementById('undo-btn').style.display = chaosMode ? 'none' : 'block';
-      document.getElementById('redo-btn').style.display = chaosMode ? 'none' : 'block';
-      document.getElementById('export-png').style.display = chaosMode ? 'none' : 'block';
+      document.getElementById('toolbar').style.opacity = chaosMode ? '0.5' : '1';
       
       // Update selection style when toggling mode
       if (selectedShape) {
@@ -216,14 +221,13 @@
     document.getElementById('export-png').addEventListener('click', () => {
       if (chaosMode) return;
       
-      const exportBtn = document.getElementById('export-png');
-      const undoBtn = document.getElementById('undo-btn');
-      const redoBtn = document.getElementById('redo-btn');
-      const originalDisplay = [exportBtn.style.display, undoBtn.style.display, redoBtn.style.display];
+      const toolbar = document.getElementById('toolbar');
+      const chaosBtn = document.getElementById('chaos-button');
+      const originalToolbarOpacity = toolbar.style.opacity;
+      const originalChaosBtnOpacity = chaosBtn.style.opacity;
       
-      exportBtn.style.display = 'none';
-      undoBtn.style.display = 'none';
-      redoBtn.style.display = 'none';
+      toolbar.style.opacity = '0';
+      chaosBtn.style.opacity = '0';
       
       html2canvas(canvas, {
         backgroundColor: '#E594BF',
@@ -234,9 +238,8 @@
         link.href = canvasImg.toDataURL('image/png');
         link.click();
         
-        exportBtn.style.display = originalDisplay[0];
-        undoBtn.style.display = originalDisplay[1];
-        redoBtn.style.display = originalDisplay[2];
+        toolbar.style.opacity = originalToolbarOpacity;
+        chaosBtn.style.opacity = originalChaosBtnOpacity;
       });
     });
 
@@ -289,8 +292,8 @@
 
     function updateButtonStates() {
       if (chaosMode) return;
-      document.getElementById('undo-btn').disabled = stateHistory.length <= 1 || currentStateIndex <= 0;
-      document.getElementById('redo-btn').disabled = currentStateIndex >= stateHistory.length - 1;
+      document.getElementById('undo-btn').style.opacity = stateHistory.length <= 1 || currentStateIndex <= 0 ? '0.5' : '1';
+      document.getElementById('redo-btn').style.opacity = currentStateIndex >= stateHistory.length - 1 ? '0.5' : '1';
     }
 
     function addPreciseSelectionOverlay(div) {
@@ -330,8 +333,8 @@
       div.className = 'canvas-shape';
       div.innerHTML = shapeSVGs[shapeKey];
       
-      div._x = shapeData?.x || (canvas.getBoundingClientRect().width / 2 - 40);
-      div._y = shapeData?.y || (canvas.getBoundingClientRect().height / 2 - 40);
+      div._x = shapeData?.x || (canvas.getBoundingClientRect().width / 2 - DEFAULT_SHAPE_SIZE/2);
+      div._y = shapeData?.y || (canvas.getBoundingClientRect().height / 2 - DEFAULT_SHAPE_SIZE/2);
       div._scale = shapeData?.scale || 1;
       div._rotation = shapeData?.rotation || 0;
       const fillColor = shapeData?.color || selectedColor;
