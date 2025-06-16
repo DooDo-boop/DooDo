@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.4 (With Redo)</title>
+  <title>DooDo v0.4.1 (With Redo & Export)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -51,7 +51,7 @@
     .canvas-shape.selected {
       outline: 2px dashed black;
     }
-    #undo-btn, #redo-btn {
+    #undo-btn, #redo-btn, #export-png {
       position: fixed;
       bottom: 12px;
       z-index: 99;
@@ -68,7 +68,10 @@
     #redo-btn {
       right: 12px;
     }
-    #undo-btn:active, #redo-btn:active {
+    #export-png {
+      left: 12px;
+    }
+    #undo-btn:active, #redo-btn:active, #export-png:active {
       background: #f0f0f0;
     }
   </style>
@@ -87,9 +90,13 @@
     </div>
   </div>
   <div id="canvas"></div>
+  <button id="export-png">Export PNG</button>
   <button id="undo-btn">Undo</button>
   <button id="redo-btn">Redo</button>
 
+  <!-- Add html2canvas library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
   <script>
     const shapeSVGs = {
       circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
@@ -149,6 +156,34 @@
         currentStateIndex++;
         restoreState();
       }
+    });
+
+    // Export PNG handler
+    document.getElementById('export-png').addEventListener('click', () => {
+      // Temporarily hide the export button to avoid it appearing in the screenshot
+      const exportBtn = document.getElementById('export-png');
+      const undoBtn = document.getElementById('undo-btn');
+      const redoBtn = document.getElementById('redo-btn');
+      const originalDisplay = [exportBtn.style.display, undoBtn.style.display, redoBtn.style.display];
+      
+      exportBtn.style.display = 'none';
+      undoBtn.style.display = 'none';
+      redoBtn.style.display = 'none';
+      
+      html2canvas(canvas, {
+        backgroundColor: '#E594BF', // Match the background color
+        scale: 2 // Higher quality export
+      }).then(canvasImg => {
+        const link = document.createElement('a');
+        link.download = 'DooDo-Artwork-' + new Date().toISOString().slice(0, 10) + '.png';
+        link.href = canvasImg.toDataURL('image/png');
+        link.click();
+        
+        // Restore buttons after export
+        exportBtn.style.display = originalDisplay[0];
+        undoBtn.style.display = originalDisplay[1];
+        redoBtn.style.display = originalDisplay[2];
+      });
     });
 
     function saveState(initial = false) {
