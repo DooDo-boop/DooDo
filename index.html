@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.5.1 (Total Chaos)</title>
+  <title>DooDo v0.5.2 (Controlled Chaos)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -48,8 +48,9 @@
       will-change: transform;
       transition: none;
     }
-    .canvas-shape.selected {
-      outline: 2px dashed black;
+    .canvas-shape.chaos-outline {
+      outline: 3px dashed #FF0000;
+      outline-offset: -3px;
     }
     #undo-btn, #redo-btn, #export-png {
       position: fixed;
@@ -121,9 +122,9 @@
   
   <script>
     const shapeSVGs = {
-      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
+      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="38"/></svg>',
       rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
-      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,0 80,80 0,80"/></svg>'
+      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,2 78,78 2,78"/></svg>'
     };
 
     const canvas = document.getElementById('canvas');
@@ -148,6 +149,22 @@
       document.getElementById('undo-btn').style.display = chaosMode ? 'none' : 'block';
       document.getElementById('redo-btn').style.display = chaosMode ? 'none' : 'block';
       document.getElementById('export-png').style.display = chaosMode ? 'none' : 'block';
+      
+      // Update selection style when toggling mode
+      if (selectedShape) {
+        if (chaosMode) {
+          selectedShape.classList.add('chaos-outline');
+          const shapeEl = selectedShape.querySelector('svg > *');
+          if (shapeEl) {
+            shapeEl.removeAttribute('stroke');
+            shapeEl.removeAttribute('stroke-width');
+            shapeEl.removeAttribute('stroke-dasharray');
+          }
+        } else {
+          selectedShape.classList.remove('chaos-outline');
+          addPreciseSelectionOverlay(selectedShape);
+        }
+      }
       
       // Little shake animation when activating chaos mode
       if (chaosMode) {
@@ -276,12 +293,36 @@
       document.getElementById('redo-btn').disabled = currentStateIndex >= stateHistory.length - 1;
     }
 
-    function addSelectionOverlay(div) {
-      div.style.outline = '2px dashed black';
+    function addPreciseSelectionOverlay(div) {
+      const shape = div.querySelector('svg > *');
+      shape.setAttribute('stroke', '#000');
+      shape.setAttribute('stroke-width', '2');
+      shape.setAttribute('stroke-dasharray', '4 2');
+      shape.setAttribute('stroke-linejoin', 'round');
+      shape.setAttribute('vector-effect', 'non-scaling-stroke');
+      div.classList.remove('chaos-outline');
+    }
+
+    function addChaosSelectionOverlay(div) {
+      div.classList.add('chaos-outline');
+      const shape = div.querySelector('svg > *');
+      if (shape) {
+        shape.removeAttribute('stroke');
+        shape.removeAttribute('stroke-width');
+        shape.removeAttribute('stroke-dasharray');
+      }
     }
 
     function removeSelectionOverlay(div) {
-      if (div) div.style.outline = 'none';
+      if (!div) return;
+      div.classList.remove('chaos-outline');
+      const shape = div.querySelector('svg > *');
+      if (shape) {
+        shape.removeAttribute('stroke');
+        shape.removeAttribute('stroke-width');
+        shape.removeAttribute('stroke-dasharray');
+        shape.removeAttribute('vector-effect');
+      }
     }
 
     function createShape(shapeKey, shapeData = null) {
@@ -301,9 +342,14 @@
       if (selectedShape) {
         removeSelectionOverlay(selectedShape);
       }
-      addSelectionOverlay(div);
-      selectedShape = div;
       
+      if (chaosMode) {
+        addChaosSelectionOverlay(div);
+      } else {
+        addPreciseSelectionOverlay(div);
+      }
+      
+      selectedShape = div;
       updateTransform(div);
       canvas.appendChild(div);
 
@@ -454,7 +500,7 @@
             removeSelectionOverlay(selectedShape);
           }
 
-          addSelectionOverlay(randomShape);
+          addChaosSelectionOverlay(randomShape);
           selectedShape = randomShape;
         } else {
           // 30% chance we select *nothing*
@@ -466,7 +512,7 @@
             if (selectedShape && selectedShape !== clickedShape) {
               removeSelectionOverlay(selectedShape);
             }
-            addSelectionOverlay(clickedShape);
+            addChaosSelectionOverlay(clickedShape);
             selectedShape = clickedShape;
           }
         }
@@ -475,7 +521,7 @@
         if (selectedShape && selectedShape !== clickedShape) {
           removeSelectionOverlay(selectedShape);
         }
-        addSelectionOverlay(clickedShape);
+        addPreciseSelectionOverlay(clickedShape);
         selectedShape = clickedShape;
       }
     }
