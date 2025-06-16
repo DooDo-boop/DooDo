@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.6.1 (Optimized Layout)</title>
+  <title>DooDo v0.6.3 (Optimized Chaos)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -67,17 +67,16 @@
     }
     #toolbar {
       position: fixed;
-      top: 50px; /* Below chaos button */
+      top: 8px;
       right: 12px;
       display: flex;
-      flex-direction: column;
       gap: 8px;
       z-index: 100;
     }
     #chaos-button {
       position: fixed;
       top: 8px;
-      right: 12px;
+      right: 160px; /* Adjusted to make space for horizontal tools */
       z-index: 100;
       background: #ED1C24;
       color: white;
@@ -113,7 +112,7 @@
   </div>
   <div id="canvas"></div>
   
-  <!-- Tools moved to top right below chaos button -->
+  <!-- Horizontal toolbar -->
   <div id="toolbar">
     <div id="export-png" class="tool-button" title="Export">🖼️</div>
     <div id="undo-btn" class="tool-button" title="Undo">↩️</div>
@@ -152,8 +151,8 @@
       btn.style.color = chaosMode ? '#FAF073' : 'white';
       btn.style.boxShadow = chaosMode ? '3px 3px 0 #ED1C24' : '2px 2px 0 #000';
       
-      // Toggle tool visibility
-      document.getElementById('toolbar').style.opacity = chaosMode ? '0.5' : '1';
+      // Hide/show tools based on chaos mode
+      document.getElementById('toolbar').style.display = chaosMode ? 'none' : 'flex';
       
       // Update selection style when toggling mode
       if (selectedShape) {
@@ -223,11 +222,11 @@
       
       const toolbar = document.getElementById('toolbar');
       const chaosBtn = document.getElementById('chaos-button');
-      const originalToolbarOpacity = toolbar.style.opacity;
-      const originalChaosBtnOpacity = chaosBtn.style.opacity;
+      const originalToolbarDisplay = toolbar.style.display;
+      const originalChaosBtnDisplay = chaosBtn.style.display;
       
-      toolbar.style.opacity = '0';
-      chaosBtn.style.opacity = '0';
+      toolbar.style.display = 'none';
+      chaosBtn.style.display = 'none';
       
       html2canvas(canvas, {
         backgroundColor: '#E594BF',
@@ -238,8 +237,8 @@
         link.href = canvasImg.toDataURL('image/png');
         link.click();
         
-        toolbar.style.opacity = originalToolbarOpacity;
-        chaosBtn.style.opacity = originalChaosBtnOpacity;
+        toolbar.style.display = originalToolbarDisplay;
+        chaosBtn.style.display = originalChaosBtnDisplay;
       });
     });
 
