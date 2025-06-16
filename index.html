@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.4.3 (More Polish)</title>
+  <title>DooDo v0.4.3 (Perfect Outlines)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -95,9 +95,9 @@
   
   <script>
     const shapeSVGs = {
-      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
+      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="38"/></svg>',
       rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
-      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,0 80,80 0,80"/></svg>'
+      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,2 78,78 2,78"/></svg>'
     };
 
     const canvas = document.getElementById('canvas');
@@ -230,6 +230,7 @@
       shape.setAttribute('stroke-dasharray', '4 2');
       shape.setAttribute('stroke-linejoin', 'round');
       shape.setAttribute('vector-effect', 'non-scaling-stroke');
+      shape.setAttribute('stroke-alignment', 'outer');
     }
 
     function removeSelectionOverlay(div) {
@@ -240,6 +241,7 @@
         shape.removeAttribute('stroke-width');
         shape.removeAttribute('stroke-dasharray');
         shape.removeAttribute('vector-effect');
+        shape.removeAttribute('stroke-alignment');
       }
     }
 
@@ -257,7 +259,6 @@
       const shapeElement = div.querySelector('svg > *');
       if (shapeElement) shapeElement.setAttribute('fill', fillColor);
       
-      // Auto-select the new shape
       if (selectedShape) {
         removeSelectionOverlay(selectedShape);
       }
