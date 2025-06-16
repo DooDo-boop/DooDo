@@ -140,8 +140,6 @@
       if (stateHistory.length > 1 && currentStateIndex > 0) {
         currentStateIndex--;
         restoreState();
-        // After undo, we need to ensure next saveState doesn't create duplicate
-        stateHistory.length = currentStateIndex + 1;
       }
     });
 
