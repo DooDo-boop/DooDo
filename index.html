@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.5 (Chaos Mode)</title>
+  <title>DooDo v0.5.1 (Total Chaos)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -48,6 +48,9 @@
       will-change: transform;
       transition: none;
     }
+    .canvas-shape.selected {
+      outline: 2px dashed black;
+    }
     #undo-btn, #redo-btn, #export-png {
       position: fixed;
       bottom: 12px;
@@ -88,6 +91,11 @@
     #undo-btn:active, #redo-btn:active, #export-png:active {
       background: #f0f0f0;
     }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+      20%, 40%, 60%, 80% { transform: translateX(3px); }
+    }
   </style>
 </head>
 <body>
@@ -113,9 +121,9 @@
   
   <script>
     const shapeSVGs = {
-      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="38"/></svg>',
+      circle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="40"/></svg>',
       rect: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80"/></svg>',
-      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,2 78,78 2,78"/></svg>'
+      triangle: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><polygon points="40,0 80,80 0,80"/></svg>'
     };
 
     const canvas = document.getElementById('canvas');
@@ -136,6 +144,11 @@
       btn.style.color = chaosMode ? '#FAF073' : 'white';
       btn.style.boxShadow = chaosMode ? '3px 3px 0 #ED1C24' : '2px 2px 0 #000';
       
+      // Toggle tool visibility
+      document.getElementById('undo-btn').style.display = chaosMode ? 'none' : 'block';
+      document.getElementById('redo-btn').style.display = chaosMode ? 'none' : 'block';
+      document.getElementById('export-png').style.display = chaosMode ? 'none' : 'block';
+      
       // Little shake animation when activating chaos mode
       if (chaosMode) {
         btn.style.animation = 'shake 0.5s';
@@ -155,7 +168,7 @@
         if (selectedShape) {
           const shapeEl = selectedShape.querySelector('svg > *');
           if (shapeEl) shapeEl.setAttribute('fill', selectedColor);
-          saveState();
+          if (!chaosMode) saveState();
         }
       });
     });
@@ -165,25 +178,27 @@
         e.preventDefault();
         const shapeKey = icon.dataset.shape;
         createShape(shapeKey);
-        saveState();
+        if (!chaosMode) saveState();
       });
     });
 
     document.getElementById('undo-btn').addEventListener('click', () => {
-      if (stateHistory.length > 1 && currentStateIndex > 0) {
+      if (!chaosMode && stateHistory.length > 1 && currentStateIndex > 0) {
         currentStateIndex--;
         restoreState();
       }
     });
 
     document.getElementById('redo-btn').addEventListener('click', () => {
-      if (currentStateIndex < stateHistory.length - 1) {
+      if (!chaosMode && currentStateIndex < stateHistory.length - 1) {
         currentStateIndex++;
         restoreState();
       }
     });
 
     document.getElementById('export-png').addEventListener('click', () => {
+      if (chaosMode) return;
+      
       const exportBtn = document.getElementById('export-png');
       const undoBtn = document.getElementById('undo-btn');
       const redoBtn = document.getElementById('redo-btn');
@@ -209,6 +224,8 @@
     });
 
     function saveState(initial = false) {
+      if (chaosMode && !initial) return;
+      
       if (!initial && stateHistory.length > 0) {
         const currentState = JSON.stringify(stateHistory[currentStateIndex]);
         const newState = JSON.stringify(getCurrentShapes());
@@ -254,30 +271,17 @@
     }
 
     function updateButtonStates() {
+      if (chaosMode) return;
       document.getElementById('undo-btn').disabled = stateHistory.length <= 1 || currentStateIndex <= 0;
       document.getElementById('redo-btn').disabled = currentStateIndex >= stateHistory.length - 1;
     }
 
     function addSelectionOverlay(div) {
-      const shape = div.querySelector('svg > *');
-      shape.setAttribute('stroke', '#000');
-      shape.setAttribute('stroke-width', '2');
-      shape.setAttribute('stroke-dasharray', '4 2');
-      shape.setAttribute('stroke-linejoin', 'round');
-      shape.setAttribute('vector-effect', 'non-scaling-stroke');
-      shape.setAttribute('stroke-alignment', 'outer');
+      div.style.outline = '2px dashed black';
     }
 
     function removeSelectionOverlay(div) {
-      if (!div) return;
-      const shape = div.querySelector('svg > *');
-      if (shape) {
-        shape.removeAttribute('stroke');
-        shape.removeAttribute('stroke-width');
-        shape.removeAttribute('stroke-dasharray');
-        shape.removeAttribute('vector-effect');
-        shape.removeAttribute('stroke-alignment');
-      }
+      if (div) div.style.outline = 'none';
     }
 
     function createShape(shapeKey, shapeData = null) {
@@ -380,7 +384,7 @@
           hasMoved = false;
           dragging = false;
           startTouches = [];
-          saveState();
+          if (!chaosMode) saveState();
           return;
         }
 
@@ -394,7 +398,7 @@
             rotation: div._rotation,
             color: div.querySelector('svg > *')?.getAttribute('fill') || selectedColor
           });
-          saveState();
+          if (!chaosMode) saveState();
           return;
         }
 
@@ -430,7 +434,7 @@
       div.addEventListener('pointerup', (e) => {
         if (!dragging) {
           handleSelectionLogic(div);
-        } else {
+        } else if (!chaosMode) {
           saveState();
         }
         dragging = false;
@@ -487,7 +491,7 @@
           if (selectedShape === shape) {
             selectedShape = null;
           }
-          saveState();
+          if (!chaosMode) saveState();
         }
       }, 300);
     }
