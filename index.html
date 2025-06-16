@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DooDo v0.4.1 (With Redo & Export)</title>
+  <title>DooDo v0.4.2 (Polished)</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { 
@@ -48,9 +48,6 @@
       will-change: transform;
       transition: none;
     }
-    .canvas-shape.selected {
-      outline: 2px dashed black;
-    }
     #undo-btn, #redo-btn, #export-png {
       position: fixed;
       bottom: 12px;
@@ -94,7 +91,6 @@
   <button id="undo-btn">Undo</button>
   <button id="redo-btn">Redo</button>
 
-  <!-- Add html2canvas library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <script>
@@ -109,14 +105,11 @@
     let selectedShape = null;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
-    // Track complete canvas states
     const stateHistory = [];
     let currentStateIndex = -1;
     
-    // Initialize with empty state
     saveState(true);
 
-    // Add color palette handler
     document.querySelectorAll('.color-swatch').forEach(swatch => {
       swatch.addEventListener(isMobile ? 'touchstart' : 'click', (e) => {
         if (isMobile) e.preventDefault();
@@ -132,7 +125,6 @@
       });
     });
 
-    // Add shape palette handler
     document.querySelectorAll('.shape-icon').forEach(icon => {
       icon.addEventListener('click', (e) => {
         e.preventDefault();
@@ -142,7 +134,6 @@
       });
     });
 
-    // Undo button handler
     document.getElementById('undo-btn').addEventListener('click', () => {
       if (stateHistory.length > 1 && currentStateIndex > 0) {
         currentStateIndex--;
@@ -150,7 +141,6 @@
       }
     });
 
-    // Redo button handler
     document.getElementById('redo-btn').addEventListener('click', () => {
       if (currentStateIndex < stateHistory.length - 1) {
         currentStateIndex++;
@@ -158,9 +148,7 @@
       }
     });
 
-    // Export PNG handler
     document.getElementById('export-png').addEventListener('click', () => {
-      // Temporarily hide the export button to avoid it appearing in the screenshot
       const exportBtn = document.getElementById('export-png');
       const undoBtn = document.getElementById('undo-btn');
       const redoBtn = document.getElementById('redo-btn');
@@ -171,15 +159,14 @@
       redoBtn.style.display = 'none';
       
       html2canvas(canvas, {
-        backgroundColor: '#E594BF', // Match the background color
-        scale: 2 // Higher quality export
+        backgroundColor: '#E594BF',
+        scale: 2
       }).then(canvasImg => {
         const link = document.createElement('a');
         link.download = 'DooDo-Artwork-' + new Date().toISOString().slice(0, 10) + '.png';
         link.href = canvasImg.toDataURL('image/png');
         link.click();
         
-        // Restore buttons after export
         exportBtn.style.display = originalDisplay[0];
         undoBtn.style.display = originalDisplay[1];
         redoBtn.style.display = originalDisplay[2];
@@ -187,14 +174,12 @@
     });
 
     function saveState(initial = false) {
-      // Don't save duplicate states
       if (!initial && stateHistory.length > 0) {
         const currentState = JSON.stringify(stateHistory[currentStateIndex]);
         const newState = JSON.stringify(getCurrentShapes());
         if (currentState === newState) return;
       }
       
-      // If we're not at the end of history, prune future states
       if (currentStateIndex < stateHistory.length - 1) {
         stateHistory.length = currentStateIndex + 1;
       }
@@ -221,13 +206,11 @@
     }
 
     function restoreState() {
-      // Clear canvas
       while (canvas.firstChild) {
         canvas.removeChild(canvas.firstChild);
       }
       selectedShape = null;
       
-      // Recreate all shapes from history
       const shapes = stateHistory[currentStateIndex];
       shapes.forEach(shapeData => {
         createShape(shapeData.type, shapeData);
@@ -236,11 +219,27 @@
     }
 
     function updateButtonStates() {
-      // Update undo button state
       document.getElementById('undo-btn').disabled = stateHistory.length <= 1 || currentStateIndex <= 0;
-      
-      // Update redo button state
       document.getElementById('redo-btn').disabled = currentStateIndex >= stateHistory.length - 1;
+    }
+
+    function addSelectionOverlay(div) {
+      const svg = div.querySelector('svg');
+      const shape = svg.querySelector('*');
+      shape.setAttribute('stroke', '#000');
+      shape.setAttribute('stroke-width', '3');
+      shape.setAttribute('stroke-dasharray', '4 2');
+      shape.setAttribute('stroke-linejoin', 'round');
+    }
+
+    function removeSelectionOverlay(div) {
+      if (!div) return;
+      const shape = div.querySelector('svg > *');
+      if (shape) {
+        shape.removeAttribute('stroke');
+        shape.removeAttribute('stroke-width');
+        shape.removeAttribute('stroke-dasharray');
+      }
     }
 
     function createShape(shapeKey, shapeData = null) {
@@ -248,31 +247,34 @@
       div.className = 'canvas-shape';
       div.innerHTML = shapeSVGs[shapeKey];
       
-      // Initialize with provided data or defaults
       div._x = shapeData?.x || (canvas.getBoundingClientRect().width / 2 - 40);
       div._y = shapeData?.y || (canvas.getBoundingClientRect().height / 2 - 40);
       div._scale = shapeData?.scale || 1;
       div._rotation = shapeData?.rotation || 0;
       const fillColor = shapeData?.color || selectedColor;
 
-      // Set initial properties
       const shapeElement = div.querySelector('svg > *');
       if (shapeElement) shapeElement.setAttribute('fill', fillColor);
+      
+      // Auto-select the new shape
+      if (selectedShape) {
+        removeSelectionOverlay(selectedShape);
+      }
+      addSelectionOverlay(div);
+      selectedShape = div;
+      
       updateTransform(div);
       canvas.appendChild(div);
 
-      // Add interaction handlers
       setupShapeInteractions(div, shapeKey);
       return div;
     }
 
     function setupShapeInteractions(div, shapeKey) {
-      // Bring to front on tap
       div.addEventListener('pointerdown', () => {
         canvas.appendChild(div);
       });
 
-      // Touch events
       let startTouches = [];
       let origState = {};
       let dragging = false;
@@ -285,7 +287,6 @@
         e.preventDefault();
         hasMoved = false;
         
-        // Set up long press timer
         longPressTimer = setTimeout(() => {
           if (!hasMoved) {
             animateDelete(div);
@@ -348,7 +349,6 @@
 
         const now = Date.now();
         
-        // Double-tap check
         if (now - lastTap < 300 && !dragging && e.touches.length === 0) {
           const clone = createShape(shapeKey, {
             x: div._x + 20,
@@ -361,13 +361,12 @@
           return;
         }
 
-        // Select this shape (only if not dragging and no movement)
         if (!dragging && e.touches.length === 0) {
-          if (selectedShape) {
-            selectedShape.classList.remove('selected');
+          if (selectedShape && selectedShape !== div) {
+            removeSelectionOverlay(selectedShape);
           }
+          addSelectionOverlay(div);
           selectedShape = div;
-          div.classList.add('selected');
         }
 
         lastTap = now;
@@ -375,7 +374,6 @@
         startTouches = [];
       });
 
-      // Pointer events for desktop
       div.addEventListener('pointerdown', e => {
         e.preventDefault();
         dragging = true;
@@ -398,11 +396,11 @@
 
       div.addEventListener('pointerup', (e) => {
         if (!dragging) {
-          if (selectedShape) {
-            selectedShape.classList.remove('selected');
+          if (selectedShape && selectedShape !== div) {
+            removeSelectionOverlay(selectedShape);
           }
+          addSelectionOverlay(div);
           selectedShape = div;
-          div.classList.add('selected');
         } else {
           saveState();
         }
@@ -442,7 +440,6 @@
       return Math.atan2(dy, dx) * (180 / Math.PI);
     }
 
-    // Initialize button states
     updateButtonStates();
   </script>
 </body>
